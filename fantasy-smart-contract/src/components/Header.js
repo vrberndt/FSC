@@ -14,10 +14,18 @@ const Header = () => {
     navigate('/');
   };
 
+  const handleBrandClick = () => {
+    if (isAuthenticated) {
+      navigate('/dashboard');
+    } else {
+      navigate('/');
+    }
+  };
+
   return (
     <Navbar bg="light" variant="light" expand="lg">
       <Container>
-        <Navbar.Brand href="/">Fantasy Sports Contracts</Navbar.Brand>
+      <Navbar.Brand onClick={handleBrandClick} style={{ cursor: 'pointer' }}>Fantasy Sports Contracts</Navbar.Brand>
         <Navbar.Toggle aria-controls="basic-navbar-nav" />
         <Navbar.Collapse id="basic-navbar-nav">
           <Nav className="me-auto">
