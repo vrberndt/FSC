@@ -102,11 +102,23 @@ router.get('/:leagueId', auth, async (req, res) => {
 router.get('/', auth, async (req, res) => {
   try {
     const status = req.query.status;
-    const leagues = await League.find({
-      'invitations.user': req.user.id,
-      'invitations.status': status,
-    });
+    let query;
 
+    if (status === "accepted") {
+      query = {
+        $or: [
+          { members: { $in: [req.user.id] } },
+          { admin: req.user.id },
+        ],
+      };
+    } else {
+      query = {
+        'invitations.user': req.user.id,
+        'invitations.status': status,
+      };
+    }
+
+    const leagues = await League.find(query);
     res.json(leagues);
   } catch (error) {
     console.error(error);
@@ -117,6 +129,7 @@ router.get('/', auth, async (req, res) => {
 // Join a league
 router.put('/:leagueId/join', auth, async (req, res) => {
   try {
+    console.log('User email:', req.user.email);
     const leagueId = req.params.leagueId;
     const userId = req.user.id;
 
@@ -152,6 +165,7 @@ router.put('/:leagueId/join', auth, async (req, res) => {
 // Decline a league
 router.put('/:leagueId/decline', auth, async (req, res) => {
   try {
+    console.log('User email:', req.user.email);
     const leagueId = req.params.leagueId;
     const userId = req.user.id;
 

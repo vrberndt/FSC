@@ -17,7 +17,7 @@ function App() {
         <Route path="/signup" element={<Signup />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/createleague" element={<CreateLeague />} />
-        <Route path="/league/:leagueId" element={<ViewLeague />} /> 
+        <Route path="/leagues/:leagueId" element={<ViewLeague />} /> 
       </Routes>
     </Router>
   );

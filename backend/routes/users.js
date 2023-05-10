@@ -26,7 +26,7 @@ router.post('/register', async (req, res) => {
     await newUser.save();
 
     // Sign and send the JWT token
-    const token = jwt.sign({ id: newUser._id, username: newUser.username }, process.env.JWT_SECRET, { expiresIn: '1h' });
+    const token = jwt.sign({ id: newUser._id, username: newUser.username, email: newUser.email }, process.env.JWT_SECRET, { expiresIn: '1h' });
     res.status(201).json({ token }); // Send the token to the frontend
   } catch (error) {
     console.error('Error during registration:', error); // Log error on the server-side

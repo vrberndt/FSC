@@ -211,20 +211,21 @@ const AuthProvider = ({ children }) => {
       if (response.ok) {
         const allLeagues = await response.json();
         console.log(`Fetched all leagues for status '${status}':`, allLeagues);
-
+  
         if (status === "accepted") {
           return allLeagues.filter((league) =>
-            league.members.some(
-              (member) =>
-                member.member._id === currentUser._id &&
-                (member.status === "accepted" || member.status === "admin")
+            league.admin._id === currentUser._id ||
+            league.invitations.some(
+              (invitation) =>
+                invitation.user._id === currentUser._id &&
+                (invitation.status === "accepted" || invitation.role === "Admin")
             )
           );
         } else {
           return allLeagues.filter((league) =>
-            league.members.some(
-              (member) =>
-                member.member._id === currentUser._id && member.status === status
+            league.invitations.some(
+              (invitation) =>
+                invitation.user._id === currentUser._id && invitation.status === status
             )
           );
         }

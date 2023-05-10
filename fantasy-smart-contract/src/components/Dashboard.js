@@ -50,7 +50,7 @@ const Dashboard = () => {
             ) : (
               pendingInvites.map((invite) => (
                 <ListGroup.Item key={invite._id}>
-                  <Link to={`/league/${invite.league._id}`}>{invite.league.name}</Link>
+                  <Link to={`/leagues/${invite.league._id}`}>{invite.league.name}</Link>
                 </ListGroup.Item>
               ))
             )}
@@ -62,7 +62,7 @@ const Dashboard = () => {
             ) : (
               activeLeagues.map((league) => (
                 <ListGroup.Item key={league._id}>
-                  <Link to={`/league/${league._id}`}>{league.name}</Link>
+                  <Link to={`/leagues/${league._id}`}>{league.name}</Link>
                 </ListGroup.Item>
               ))
             )}

@@ -20,7 +20,7 @@ router.post('/login', async (req, res) => {
     }
 
     // Sign and send the JWT token
-    const token = jwt.sign({ id: user._id, username: user.username }, process.env.JWT_SECRET, { expiresIn: '1h' });
+    const token = jwt.sign({ id: user._id, username: user.username, email: user.email }, process.env.JWT_SECRET, { expiresIn: '1h' });
     res.header('x-auth-token', token).status(200).json({ token }); // Send the token in the response header and JSON body
 
   } catch (error) {

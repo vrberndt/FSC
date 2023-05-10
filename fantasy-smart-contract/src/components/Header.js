@@ -30,7 +30,7 @@ const Header = () => {
                 id="user-dropdown"
                 align="end"
                 menuVariant="dark"
-                style={{ position: 'static' }} // Add inline style for the dropdown menu
+                style={{ position: 'static' }}
               >
                 <NavDropdown.Item onClick={handleLogout}>Log Out</NavDropdown.Item>
               </NavDropdown>
