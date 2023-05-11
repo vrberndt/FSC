@@ -17,7 +17,6 @@ const AuthProvider = ({ children }) => {
     }
   }, []);
 
-
   const login = async (email, password) => {
     try {
       const response = await fetch('http://localhost:5001/api/auth/login', {
@@ -32,23 +31,29 @@ const AuthProvider = ({ children }) => {
         const data = await response.json();
         try {
           const userData = jwt_decode(data.token);
-          const userWithToken = { ...userData, email, token: data.token };
+  
+          console.log('Decoded JWT:', userData); // Add this line to inspect the decoded JWT
+  
+          // Add the _id field to the userWithToken object
+          const userWithToken = { ...userData, email, _id: userData.sub, token: data.token };
           setCurrentUser(userWithToken);
           setIsAuthenticated(true);
           localStorage.setItem('user', JSON.stringify(userWithToken)); // Store token and user data in localStorage
           return true;
         } catch (decodeError) {
           console.error('Error during token decoding:', decodeError.message, decodeError);
+          return false;
         }        
       } else {
         // Log the response status and text when the response is not ok
         console.error('Login failed:', response.status, await response.text());
+        return false;
       }
     } catch (error) {
       console.error('Error during login:', error);
+      return false;
     }
-    return false;
-  };
+  };  
 
   const logout = () => {
     setCurrentUser(null);
@@ -238,6 +243,29 @@ const AuthProvider = ({ children }) => {
     return [];
   };  
 
+  const updateLeague = async (leagueId, name, invitations) => {
+    try {
+      const response = await fetch(`http://localhost:5001/api/leagues/${leagueId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-auth-token': currentUser.token,
+        },
+        body: JSON.stringify({ name, invitations }),
+      });
+  
+      if (response.ok) {
+        return await response.json();
+      } else {
+        console.error('League update failed:', response.status, await response.text());
+        return null;
+      }
+    } catch (error) {
+      console.error('Error during league update:', error);
+      return null;
+    }
+  };  
+
   const value = {
     currentUser,
     isAuthenticated,
@@ -249,7 +277,8 @@ const AuthProvider = ({ children }) => {
     getPendingInvites,
     joinLeague,
     declineLeague,
-    getLeaguesByStatus
+    getLeaguesByStatus,
+    updateLeague
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

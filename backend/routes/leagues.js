@@ -197,6 +197,44 @@ router.put('/:leagueId/decline', auth, async (req, res) => {
   }
 });
 
+// Update a league
+router.put(
+  '/:leagueId',
+  [
+    auth,
+    [
+      check('name', 'League name is required').notEmpty(),
+      check('invitations.*.email', 'Email is required in invitations').isEmail(),
+      check('invitations.*.role', 'Role is required in invitations').isIn(['Admin', 'Member']),
+    ],
+  ],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    try {
+      const { name, invitations } = req.body;
+      const leagueId = req.params.leagueId;
+
+      const league = await League.findById(leagueId);
+      if (!league) {
+        return res.status(404).json({ msg: 'League not found' });
+      }
+
+      league.name = name;
+      league.invitations = invitations;
+
+      await league.save();
+
+      res.json(league);
+    } catch (err) {
+      console.error(err.message);
+      res.status(500).send('Server error');
+    }
+  }
+);
 
 // Other API routes for update, delete, and fetch leagues will be added here
 
