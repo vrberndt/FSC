@@ -52,7 +52,7 @@ const CreateLeague = () => {
         role: member.role,
         status: member.status || 'pending',
       }));
-      console.log('name:', name, 'invitations:', invitations); // Add this line
+      console.log('name:', name, 'invitations:', invitations); 
       const league = await createLeague(name, invitations);
       if (league) {
         navigate(`/leagues/${league._id}`);

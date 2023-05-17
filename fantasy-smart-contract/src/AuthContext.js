@@ -111,27 +111,6 @@ const AuthProvider = ({ children }) => {
     }
   };  
 
-  const inviteToLeague = async (leagueId, userId) => {
-    try {
-      const response = await fetch(`http://localhost:5001/api/leagues/${leagueId}/invite`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-auth-token': currentUser.token,
-        },
-      });
-  
-      if (response.ok) {
-        return await response.json();
-      } else {
-        console.error('Invite failed:', response.status, await response.text());
-      }
-    } catch (error) {
-      console.error('Error during invite:', error);
-    }
-    return false;
-  };  
-
   const getPendingInvites = async () => {
     try {
       const response = await fetch('http://localhost:5001/api/leagues/invitations', {
@@ -144,7 +123,7 @@ const AuthProvider = ({ children }) => {
   
       if (response.ok) {
         const invites = await response.json();
-        console.log("Fetched pending invites in AuthContext:", invites); // Add this line
+        console.log("Fetched pending invites in AuthContext:", invites);
         return invites;
       } else {
         console.error('Get pending invites failed:', response.status, await response.text());
@@ -222,7 +201,7 @@ const AuthProvider = ({ children }) => {
             league.admin._id === currentUser._id ||
             league.invitations.some(
               (invitation) =>
-                invitation.user._id === currentUser._id &&
+                invitation.email === currentUser.email &&
                 (invitation.status === "accepted" || invitation.role === "Admin")
             )
           );
@@ -230,7 +209,7 @@ const AuthProvider = ({ children }) => {
           return allLeagues.filter((league) =>
             league.invitations.some(
               (invitation) =>
-                invitation.user._id === currentUser._id && invitation.status === status
+                invitation.email === currentUser.email && invitation.status === status
             )
           );
         }
@@ -245,13 +224,20 @@ const AuthProvider = ({ children }) => {
 
   const updateLeague = async (leagueId, name, invitations) => {
     try {
+      console.log("Invitations:", invitations);
+      const updatedInvitations = invitations.map(invite => ({
+        ...invite,
+        role: 'Member', 
+        status: invite.status
+      }));
+  
       const response = await fetch(`http://localhost:5001/api/leagues/${leagueId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           'x-auth-token': currentUser.token,
         },
-        body: JSON.stringify({ name, invitations }),
+        body: JSON.stringify({ name, invitations: updatedInvitations, }), 
       });
   
       if (response.ok) {
@@ -264,7 +250,7 @@ const AuthProvider = ({ children }) => {
       console.error('Error during league update:', error);
       return null;
     }
-  };  
+};
 
   const value = {
     currentUser,
@@ -273,7 +259,6 @@ const AuthProvider = ({ children }) => {
     logout,
     signup,
     createLeague,
-    inviteToLeague,
     getPendingInvites,
     joinLeague,
     declineLeague,
