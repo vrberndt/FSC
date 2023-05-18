@@ -300,7 +300,8 @@ const ViewLeague = () => {
                 <Row key={index} className="mb-3">
                   <Col>
                     {invitation.email}
-                    {emailExistsMap[invitation.email] && (
+                    {invitation.user && invitation.user.username && ` (${invitation.user.username})`}
+                    {invitation.user && (
                       <FontAwesomeIcon
                         icon={faCheck}
                         className="text-success ml-2"
@@ -312,7 +313,7 @@ const ViewLeague = () => {
                     <span>{invitation.role} (Pending)</span>
                   </Col>
                 </Row>
-              ))}
+            ))}
           </Container>
           {emailInputs.map((email, index) => (
         <Form.Group controlId={`newEmail${index}`} key={index}>
@@ -369,7 +370,8 @@ const ViewLeague = () => {
                 <tr key={index}>
                   <td>
                     {invitation.email}
-                    {emailExistsMap[invitation.email] && (
+                    {invitation.user && invitation.user.username && ` (${invitation.user.username})`}
+                    {invitation.user && (
                       <FontAwesomeIcon
                         icon={faCheck}
                         className="text-success ml-2"
@@ -378,7 +380,7 @@ const ViewLeague = () => {
                     )}
                   </td>
                   <td>{invitation.role} (Pending)</td>
-              </tr>
+                </tr>
             ))}
         </tbody>
       </Table>
