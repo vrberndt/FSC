@@ -196,23 +196,11 @@ const AuthProvider = ({ children }) => {
         const allLeagues = await response.json();
         console.log(`Fetched all leagues for status '${status}':`, allLeagues);
   
-        if (status === "accepted") {
-          return allLeagues.filter((league) =>
-            league.admin._id === currentUser._id ||
-            league.invitations.some(
-              (invitation) =>
-                invitation.email === currentUser.email &&
-                (invitation.status === "accepted" || invitation.role === "Admin")
-            )
-          );
-        } else {
-          return allLeagues.filter((league) =>
-            league.invitations.some(
-              (invitation) =>
-                invitation.email === currentUser.email && invitation.status === status
-            )
-          );
-        }
+        return allLeagues.filter((league) =>
+          league.invitations.some(
+            (invitation) => invitation.email === currentUser.email && invitation.status === status
+          )
+        );
       } else {
         console.error(`Get ${status} leagues failed:`, response.status, await response.text());
       }
@@ -222,22 +210,15 @@ const AuthProvider = ({ children }) => {
     return [];
   };  
 
-  const updateLeague = async (leagueId, name, invitations) => {
+  const updateLeague = async (leagueId, name, members) => {
     try {
-      console.log("Invitations:", invitations);
-      const updatedInvitations = invitations.map(invite => ({
-        ...invite,
-        role: 'Member', 
-        status: invite.status
-      }));
-  
       const response = await fetch(`http://localhost:5001/api/leagues/${leagueId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           'x-auth-token': currentUser.token,
         },
-        body: JSON.stringify({ name, invitations: updatedInvitations, }), 
+        body: JSON.stringify({ name, members }), 
       });
   
       if (response.ok) {
@@ -250,7 +231,33 @@ const AuthProvider = ({ children }) => {
       console.error('Error during league update:', error);
       return null;
     }
-};
+  };  
+
+  async function inviteToLeague(leagueId, inviteData) {
+    try {
+      const response = await fetch(
+        `http://localhost:5001/api/leagues/${leagueId}/invite`,
+        {
+          method: 'POST',
+          headers: {
+            'x-auth-token': currentUser.token,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(inviteData),
+        }
+      );
+  
+      if (response.ok) {
+        return true;
+      } else {
+        console.error('Failed to invite user:', response.status, await response.text());
+        return false;
+      }
+    } catch (error) {
+      console.error('Error during invitation:', error);
+      return false;
+    }
+  }
 
   const value = {
     currentUser,
@@ -263,7 +270,8 @@ const AuthProvider = ({ children }) => {
     joinLeague,
     declineLeague,
     getLeaguesByStatus,
-    updateLeague
+    updateLeague,
+    inviteToLeague
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

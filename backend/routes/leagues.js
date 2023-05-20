@@ -27,30 +27,42 @@ router.post(
 
       const newLeague = new League({
         name,
-        admin: req.user.id,
-        members: [req.user.id],
       });
 
       const league = await newLeague.save();
 
-// Create separate invitations in the Invitation collection
-const invitationPromises = invitations.map(async (invitation) => {
-  const user = await User.findOne({ email: invitation.email });
-  console.log('User found for email:', invitation.email, user);  
-  console.log('User found:', user);
+      // Create admin invitation for the league creator
+      const creatorInvitation = new Invitation({
+        league: league._id,
+        email: req.user.email,
+        role: 'Admin',
+        status: 'accepted',
+        user: req.user.id,
+      });
 
-  const newInvitation = new Invitation({
-    league: league._id,
-    email: invitation.email,
-    role: invitation.role,
-    status: 'pending',
-    user: user ? user._id : undefined,
-  });
+      await creatorInvitation.save();
+      league.invitations.push(creatorInvitation);
+      await league.save();
 
-  return newInvitation.save();
-});
+      // Create separate invitations in the Invitation collection
+      const invitationPromises = invitations.map(async (invitation) => {
+        const user = await User.findOne({ email: invitation.email });
 
-await Promise.all(invitationPromises);
+        const newInvitation = new Invitation({
+          league: league._id,
+          email: invitation.email,
+          role: invitation.role,
+          status: 'pending',
+          user: user ? user._id : undefined,
+        });
+
+        league.invitations.push(newInvitation);
+
+        return newInvitation.save();
+      });
+
+      await Promise.all(invitationPromises);
+      await league.save();
 
       res.json(league);
     } catch (err) {
@@ -87,12 +99,17 @@ router.get('/invitations', auth, async (req, res) => {
   }
 });
 
-//Get league by ID
+// Get league by ID
 router.get('/:id', async (req, res) => {
   try {
     const league = await League.findById(req.params.id)
-      .populate('admin', 'username email')
-      .populate('members', 'username email');
+      .populate({
+        path: 'invitations',
+        populate: {
+          path: 'user',
+          select: 'username email',
+        },
+      });
 
     if (!league) {
       return res.status(404).json({ msg: 'League not found' });
@@ -108,24 +125,34 @@ router.get('/:id', async (req, res) => {
 // Get invitations for a league
 router.get('/:id/invitations', auth, async (req, res) => {
   try {
-    const league = await League.findById(req.params.id);
+    const league = await League.findById(req.params.id)
+      .populate({
+        path: 'invitations',
+        match: { status: { $in: ['accepted', 'pending'] } },
+        populate: {
+          path: 'user',
+          select: 'username email',
+        },
+      });
 
     if (!league) {
       return res.status(404).json({ msg: 'League not found' });
     }
 
     // Check if the logged-in user is a member of the league or has been invited to the league
-    const isMember = league.members.some(member => member.toString() === req.user.id);
-    const isInvited = await Invitation.exists({ user: req.user.id, league: req.params.id });
+    const isMember = league.invitations.some(
+      (invitation) => invitation.user && invitation.user._id.toString() === req.user.id && invitation.status === 'accepted'
+    );
+
+    const isInvited = league.invitations.some(
+      (invitation) => invitation.email === req.user.email && invitation.status === 'pending'
+    );
 
     if (!isMember && !isInvited) {
       return res.status(403).json({ msg: 'Not authorized' });
     }
 
-    const invitations = await Invitation.find({ league: req.params.id })
-      .populate('user', 'username email'); 
-
-    res.json(invitations);
+    res.json(league.invitations);
   } catch (err) {
     console.error(err.message);
     res.status(500).send('Server error');
@@ -136,29 +163,22 @@ router.get('/:id/invitations', auth, async (req, res) => {
 router.get('/', auth, async (req, res) => {
   try {
     const status = req.query.status;
-    let query;
 
-    if (status === "accepted") {
-      query = {
-        $or: [
-          { members: { $in: [req.user.id] } },
-          { admin: req.user.id },
-        ],
-      };
-    } else {
-      const invitations = await Invitation.find({
-        $or: [
-          { user: req.user.id },
-          { email: req.user.email },
-        ],
-        status: status,
-      });      
-    
-      const leagueIds = invitations.map(invitation => invitation.league);
-      query = { _id: { $in: leagueIds } };
-    }
+    // Find all invitations for the user with the given status
+    const invitations = await Invitation.find({
+      $or: [
+        { user: req.user.id },
+        { email: req.user.email },
+      ],
+      status: status,
+    });
 
-    const leagues = await League.find(query);
+    // Extract the league IDs from the invitations
+    const leagueIds = invitations.map((invitation) => invitation.league);
+
+    // Find all leagues with the IDs extracted from the invitations
+    const leagues = await League.find({ _id: { $in: leagueIds } }).populate('invitations');
+
     res.json(leagues);
   } catch (error) {
     console.error(error);
@@ -224,9 +244,6 @@ router.put(
     auth,
     [
       check('name', 'League name is required').notEmpty(),
-      check('invitations.*.email', 'Email is required in invitations').isEmail(),
-      check('invitations.*.role', 'Role is required in invitations').isIn(['Admin', 'Member']),
-      check('invitations.*.status', 'Status is required in invitations').isIn(['pending', 'accepted', 'declined']),
     ],
   ],
   async (req, res) => {
@@ -236,7 +253,7 @@ router.put(
     }
 
     try {
-      const { name, invitations } = req.body;
+      const { name } = req.body;
       const leagueId = req.params.leagueId;
 
       const league = await League.findById(leagueId);
@@ -245,18 +262,6 @@ router.put(
       }
 
       league.name = name;
-
-      // Create new invitations in the Invitation collection for each new invitee
-      const newInvitations = invitations.map(async (invite) => {
-        const { email, role, status } = invite;
-        const user = await User.findOne({ email });
-        if (user) {
-          return await Invitation.create({ email, role, status, league: leagueId, user: user._id });
-        }
-      });
-
-      await Promise.all(newInvitations);
-
       await league.save();
 
       res.json(league);
@@ -306,6 +311,10 @@ router.post(
         status: 'pending',
         league: leagueId,
       });
+
+      // Add the invitation to the league's invitations array and save
+      league.invitations.push(invitation._id);
+      await league.save();
 
       res.json(invitation);
     } catch (err) {

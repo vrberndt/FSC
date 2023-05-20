@@ -4,7 +4,7 @@ import { Container, Table, Button, Row, Col, Form } from 'react-bootstrap';
 import { AuthContext } from '../AuthContext';
 import { useParams, useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCheck } from '@fortawesome/free-solid-svg-icons';
+import { faCheck, faPlus } from '@fortawesome/free-solid-svg-icons';
 
 const ViewLeague = () => {
   const [league, setLeague] = useState(null);
@@ -13,7 +13,7 @@ const ViewLeague = () => {
   const navigate = useNavigate();
   const [editingMembers, setEditingMembers] = useState(false);
   const [editingLeague, setEditingLeague] = useState(null);
-  const { updateLeague } = useContext(AuthContext);
+  const { updateLeague, inviteToLeague } = useContext(AuthContext);
   const [emailExistsMap, setEmailExistsMap] = useState({});
   const [emailInputs, setEmailInputs] = useState([]);
   const [invitations, setInvitations] = useState([]);
@@ -27,25 +27,6 @@ const ViewLeague = () => {
     );
     return invitation !== undefined;
   };
-  
-  const getMemberRole = (member) => {
-    if (!invitations) {
-      console.error('Invitations is not defined');
-      return;
-    }
-  
-    if (member._id === league.admin._id) {
-      return 'Admin';
-    } else {
-      // Find the member in the invitations
-      const memberInvitation = invitations.find(invitation => invitation.email === member.email);
-      // If the member was found, return its role
-      if (memberInvitation) {
-        return memberInvitation.role;
-      }
-    }
-    return 'Member';
-  };  
 
   const checkEmailExists = useCallback(
     async (email) => {
@@ -54,7 +35,7 @@ const ViewLeague = () => {
         return;
       }
   
-      if (!league || !league.members) {
+      if (!league || !league.invitations) {
         console.error('league or league.members is not defined');
         return;
       }
@@ -83,41 +64,74 @@ const ViewLeague = () => {
     [currentUser, league]
   );
   
-  useEffect(() => {
-    const fetchLeague = async () => {
-      try {
-        const response = await fetch(
-          `http://localhost:5001/api/leagues/${leagueId}`,
-          {
-            method: 'GET',
-            headers: {
-              'x-auth-token': currentUser.token,
-            },
-          }
-        );
-  
-        if (response.ok) {
-          const data = await response.json();
-          setLeague(data);
-          console.log('Received league data:', data);
-        } else {
-          console.error('Failed to fetch league:', response.status, await response.text());
+  const fetchLeague = useCallback(async () => {
+    try {
+      const response = await fetch(
+        `http://localhost:5001/api/leagues/${leagueId}`,
+        {
+          method: 'GET',
+          headers: {
+            'x-auth-token': currentUser.token,
+          },
         }
-      } catch (error) {
-        console.error('Error fetching league:', error);
-      }
-    };
+      );
   
+      if (response.ok) {
+        const data = await response.json();
+        setLeague(data);
+        console.log('Received league data:', data);
+        return data;
+      } else {
+        console.error('Failed to fetch league:', response.status, await response.text());
+        return null;
+      }
+    } catch (error) {
+      console.error('Error fetching league:', error);
+      return null;
+    }
+  }, [currentUser, leagueId]);
+
+  const fetchInvitations = useCallback(async () => {
+    try {
+      const response = await fetch(
+        `http://localhost:5001/api/leagues/${leagueId}/invitations`,
+        {
+          method: 'GET',
+          headers: {
+            'x-auth-token': currentUser.token,
+          },
+        }
+      );
+  
+      if (response.ok) {
+        const data = await response.json();
+        setInvitations(data);
+        console.log('Received invitations:', data);
+      } else {
+        console.error('Failed to fetch invitations:', response.status, await response.text());
+      }
+    } catch (error) {
+      console.error('Error fetching invitations:', error);
+    }
+  }, [currentUser, leagueId]);
+  
+  useEffect(() => {
+    if (currentUser && league) {
+      fetchInvitations();
+    }
+  }, [currentUser, leagueId, league, fetchInvitations]);  
+
+  useEffect(() => {
     if (currentUser) {
       fetchLeague();
     }
-  }, [currentUser, leagueId]);  
+  }, [currentUser, leagueId, fetchLeague]);  
 
   useEffect(() => {
-    if (league && league.members) {
-      league.members.forEach((member) => {
-        checkEmailExists(member.email);
-      });
+    if (league && league.invitations) {
+      league.invitations.forEach((invitation) => {
+        checkEmailExists(invitation.email);
+      });    
   
       league.invitations
         .filter((invitation) => invitation.status === 'pending')
@@ -126,36 +140,6 @@ const ViewLeague = () => {
         });
     }
   }, [league, league?.members, checkEmailExists]);  
-
-  useEffect(() => {
-    const fetchInvitations = async () => {
-      try {
-        const response = await fetch(
-          `http://localhost:5001/api/leagues/${leagueId}/invitations`,
-          {
-            method: 'GET',
-            headers: {
-              'x-auth-token': currentUser.token,
-            },
-          }
-        );
-  
-        if (response.ok) {
-          const data = await response.json();
-          setInvitations(data);
-          console.log('Received invitations:', data);
-        } else {
-          console.error('Failed to fetch invitations:', response.status, await response.text());
-        }
-      } catch (error) {
-        console.error('Error fetching invitations:', error);
-      }
-    };
-  
-    if (currentUser && league) {
-      fetchInvitations();
-    }
-  }, [currentUser, leagueId, league]);
 
   const handleJoinLeague = async () => {
     const success = await joinLeague(leagueId);
@@ -176,8 +160,11 @@ const ViewLeague = () => {
   }
 
   const isAdmin = () => {
-    return currentUser.id === league.admin._id;
-  };
+    const userInvitation = league.invitations.find(
+      invitation => invitation.email === currentUser.email && invitation.status === 'accepted'
+    );
+    return userInvitation?.role === 'Admin';
+  };  
 
   const handleEditMembers = () => {
     setEditingMembers(!editingMembers);
@@ -197,49 +184,62 @@ const ViewLeague = () => {
     
     // If the new role is 'Admin', update the league's admin
     if (newRole === 'Admin') {
-      editingLeague.admin = email;
-    }
+      editingLeague.admin = email.trim();
+    }  
     
     setEditingLeague({ ...editingLeague, invitations: newInvitations });
   };
   
   const handleSave = async () => {
-    // Create new invitations array with existing invitations and new ones from emailInputs
-    const newInvitations = [
-      ...editingLeague.invitations,
-      ...emailInputs.filter(email => email).map(email => ({
-        email,
-        status: 'pending',
-        role: 'Member',
-      })),
-    ];
+    // Separate invitations into existing and new
+    const existingInvitations = editingLeague.invitations;
+    const newInvitations = emailInputs.filter(email => email).map(email => ({
+      email,
+      status: 'pending',
+      role: 'Member',
+    }));
   
-    // Update the editingLeague state with the newInvitations
-    setEditingLeague({
-      ...editingLeague,
-      invitations: newInvitations,
-    });
+    // Call updateLeague with the existing invitations if there are changes
+    if (existingInvitations.some(invitation => invitation.role !== league.invitations.find(i => i.email === invitation.email)?.role)) {
+      const updatedLeague = await updateLeague(
+        editingLeague._id,
+        existingInvitations.map(invitation => ({ email: invitation.email, role: invitation.role })),
+      );
   
-    // Wait for the state update to finish
-    await new Promise(resolve => setTimeout(resolve, 0));
+      if (!updatedLeague) {
+        alert('League update failed. Please try again.');
+        return;
+      }
+    }
   
-    // Call updateLeague with the updated invitations and admin
-    const updatedLeague = await updateLeague(
-      editingLeague._id,
-      editingLeague.name,
-      editingLeague.members,
-      newInvitations,
-      editingLeague.admin,
-    );
+    // Call inviteToLeague with the new invitations if there are new invitations
+    if (newInvitations.length > 0) {
+      for (let invitation of newInvitations) {
+        const success = await inviteToLeague(league._id, { 
+          email: invitation.email, 
+          role: invitation.role, 
+          status: invitation.status 
+        });
+        if (!success) {
+          alert('Failed to invite user. Please try again.');
+          return;
+        }
+      }
+    }
   
+    // Fetch the updated league from the server
+    const updatedLeague = await fetchLeague();
+  
+    // If all updates and invitations were successful, update the league in the state
     if (updatedLeague) {
       setLeague(updatedLeague);
-      setEditingLeague(null);
+      setEditingLeague(updatedLeague);
       setEditingMembers(false);
     } else {
-      alert('League update failed. Please try again.');
+      alert('Failed to fetch updated league. Please try again.');
     }
-  };  
+  };
+  
 
   const handleCancel = () => {
     setEditingMembers(false);
@@ -270,65 +270,48 @@ const ViewLeague = () => {
       {editingMembers ? (
         <div>
           <Container>
-            {league.members.map((member, index) => (
-              <Row key={index} className="mb-3">
-                <Col>
-                  {member.email}
-                  {member.username && ` (${member.username})`}
-                  {emailExistsMap[member.email] && (
-                    <FontAwesomeIcon
-                      icon={faCheck}
-                      className="text-success ml-2"
-                      style={{ cursor: 'pointer' }}
-                    />
-                  )}
-                </Col>
-                <Col>
-                  <select
-                    value={getMemberRole(member)}
-                    onChange={(e) => handleMemberChange(member.email, e.target.value)}
-                  >
-                    <option value="Admin">Admin</option>
-                    <option value="Member">Member</option>
-                  </select>
-                </Col>
-              </Row>
-            ))}
-            {invitations
-              .filter((invitation) => invitation.status === 'pending')
-              .map((invitation, index) => (
-                <Row key={index} className="mb-3">
-                  <Col>
-                    {invitation.email}
-                    {invitation.user && invitation.user.username && ` (${invitation.user.username})`}
-                    {invitation.user && (
-                      <FontAwesomeIcon
-                        icon={faCheck}
-                        className="text-success ml-2"
-                        style={{ cursor: 'pointer' }}
-                      />
-                    )}
-                  </Col>
-                  <Col>
-                    <span>{invitation.role} (Pending)</span>
-                  </Col>
-                </Row>
-            ))}
+          {league.invitations.map((invitation, index) => (
+            <Row key={index} className="mb-3">
+              <Col>
+                {invitation.email}
+                {invitation.user && ` (${invitation.user.username})`}
+                {emailExistsMap[invitation.email] && (
+                  <FontAwesomeIcon
+                    icon={faCheck}
+                    className="text-success ml-2"
+                    style={{ cursor: 'pointer' }}
+                  />
+                )}
+              </Col>
+              <Col>
+                <select
+                  value={invitation.role}
+                  onChange={(e) => handleMemberChange(invitation.email, e.target.value)}
+                >
+                  <option value="Admin">Admin</option>
+                  <option value="Member">Member</option>
+                </select>
+              </Col>
+            </Row>
+          ))}
           </Container>
           {emailInputs.map((email, index) => (
-        <Form.Group controlId={`newEmail${index}`} key={index}>
-          <Form.Control
-            type="email"
-            placeholder="Enter email"
-            value={email}
-            onChange={(e) => handleEmailInputChange(index, e)}
+            <Form.Group controlId={`newEmail${index}`} key={index} className="mb-3">
+              <Form.Control
+                type="email"
+                placeholder="Enter email"
+                value={email}
+                onChange={(e) => handleEmailInputChange(index, e)}
+              />
+            </Form.Group>
+          ))}
+          <FontAwesomeIcon
+            icon={faPlus}
+            className="text-success mb-3"
+            style={{ cursor: 'pointer' }}
+            onClick={handleAddMemberClick}
           />
-        </Form.Group>
-      ))}
-      <Button onClick={handleAddMemberClick}>
-        Add Member
-      </Button>
-          <Row>
+          <Row className="mt-3">
             <Col>
               <Button onClick={handleSave} className="mr-3" variant="success">
                 Save
@@ -348,56 +331,39 @@ const ViewLeague = () => {
             </tr>
           </thead>
           <tbody>
-          {league.members.map((member, index) => (
-            <tr key={index}>
-              <td>
-                {member.email}
-                {member.username && ` (${member.username})`}
-                {emailExistsMap[member.email] && (
-                  <FontAwesomeIcon
-                    icon={faCheck}
-                    className="text-success ml-2"
-                    style={{ cursor: 'pointer' }}
-                  />
-                )}
-              </td>
-                <td>{getMemberRole(member)}</td>
+            {league.invitations.map((invitation, index) => (
+              <tr key={index}>
+                <td>
+                  {invitation.email}
+                  {invitation.user && ` (${invitation.user.username})`}
+                  {emailExistsMap[invitation.email] && (
+                    <FontAwesomeIcon
+                      icon={faCheck}
+                      className="text-success ml-2"
+                      style={{ cursor: 'pointer' }}
+                    />
+                  )}
+                </td>
+                <td>{invitation.role} {invitation.status === 'pending' && '(Pending)'}</td>
               </tr>
             ))}
-            {invitations
-              .filter((invitation) => invitation.status === 'pending')
-              .map((invitation, index) => (
-                <tr key={index}>
-                  <td>
-                    {invitation.email}
-                    {invitation.user && invitation.user.username && ` (${invitation.user.username})`}
-                    {invitation.user && (
-                      <FontAwesomeIcon
-                        icon={faCheck}
-                        className="text-success ml-2"
-                        style={{ cursor: 'pointer' }}
-                      />
-                    )}
-                  </td>
-                  <td>{invitation.role} (Pending)</td>
-                </tr>
-            ))}
-        </tbody>
-      </Table>
-    )}
-    {isUserInvited() && (
-      <div className="mt-3">
-        <Button className="mr-3" onClick={handleJoinLeague}>
-          Join League
-        </Button>
-        <Button variant="secondary" onClick={handleDeclineLeague}>
-          Decline
-        </Button>
-      </div>
-    )}
-  </Container>
-);
-};
-
-export default ViewLeague;
+          </tbody>
+        </Table>
+      )}
+      {isUserInvited() && (
+        <div className="mt-3">
+          <Button className="mr-3" onClick={handleJoinLeague}>
+            Join League
+          </Button>
+          <Button variant="secondary" onClick={handleDeclineLeague}>
+            Decline
+          </Button>
+        </div>
+      )}
+    </Container>
+  );
+  };
+  
+  export default ViewLeague;
+  
   
