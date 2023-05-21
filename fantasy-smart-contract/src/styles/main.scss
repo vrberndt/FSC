@@ -5,7 +5,21 @@ $body-bg: #000;
 @import '~bootstrap/scss/bootstrap.scss';
 
 .error-message {
-    color: red;
-    font-size: 0.8em;
-    margin-top: 4px;
+  color: red;
+  font-size: 0.8em;
+  margin-top: 4px;
+}
+
+.green-icon {
+  color: #5ceb1f; 
+}
+
+.green-button {
+  background-color: #5ceb1f;
+  border-color: #5ceb1f;
+  
+  &:hover {
+    background-color: #2F9A44; 
+    border-color: #2F9A44;
   }
+}

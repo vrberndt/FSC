@@ -233,17 +233,18 @@ const ViewLeague = () => {
     // If all updates and invitations were successful, update the league in the state
     if (updatedLeague) {
       setLeague(updatedLeague);
-      setEditingLeague(updatedLeague);
+      setEditingLeague(null); // Reset the editingLeague state
       setEditingMembers(false);
+      setEmailInputs([]); // Reset the emailInputs state
     } else {
       alert('Failed to fetch updated league. Please try again.');
     }
   };
-  
 
   const handleCancel = () => {
     setEditingMembers(false);
-    setEditingLeague(null)
+    setEditingLeague(null); // Reset the editingLeague state
+    setEmailInputs([]); // Reset the emailInputs state
   };
 
   const handleEmailInputChange = (index, event) => {
@@ -278,19 +279,22 @@ const ViewLeague = () => {
                 {emailExistsMap[invitation.email] && (
                   <FontAwesomeIcon
                     icon={faCheck}
-                    className="text-success ml-2"
-                    style={{ cursor: 'pointer' }}
+                    className="green-icon ml-2"
                   />
                 )}
               </Col>
               <Col>
-                <select
-                  value={invitation.role}
-                  onChange={(e) => handleMemberChange(invitation.email, e.target.value)}
-                >
-                  <option value="Admin">Admin</option>
-                  <option value="Member">Member</option>
-                </select>
+                {invitation.status === 'accepted' ? (
+                  <select
+                    value={invitation.role}
+                    onChange={(e) => handleMemberChange(invitation.email, e.target.value)}
+                  >
+                    <option value="Admin">Admin</option>
+                    <option value="Member">Member</option>
+                  </select>
+                ) : (
+                  <div>{invitation.role}</div>
+                )}
               </Col>
             </Row>
           ))}
@@ -307,15 +311,15 @@ const ViewLeague = () => {
           ))}
           <FontAwesomeIcon
             icon={faPlus}
-            className="text-success mb-3"
+            className="green-icon mb-3"
             style={{ cursor: 'pointer' }}
             onClick={handleAddMemberClick}
           />
           <Row className="mt-3">
             <Col>
-              <Button onClick={handleSave} className="mr-3" variant="success">
-                Save
-              </Button>
+            <Button onClick={handleSave} className="mr-3" variant="primary">
+              Save
+            </Button>
               <Button onClick={handleCancel} variant="secondary">
                 Cancel
               </Button>
@@ -339,8 +343,7 @@ const ViewLeague = () => {
                   {emailExistsMap[invitation.email] && (
                     <FontAwesomeIcon
                       icon={faCheck}
-                      className="text-success ml-2"
-                      style={{ cursor: 'pointer' }}
+                      className="green-icon ml-2"
                     />
                   )}
                 </td>
@@ -352,7 +355,7 @@ const ViewLeague = () => {
       )}
       {isUserInvited() && (
         <div className="mt-3">
-          <Button className="mr-3" onClick={handleJoinLeague}>
+          <Button className="mr-3" variant='primary' onClick={handleJoinLeague}>
             Join League
           </Button>
           <Button variant="secondary" onClick={handleDeclineLeague}>

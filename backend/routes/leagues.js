@@ -105,6 +105,7 @@ router.get('/:id', async (req, res) => {
     const league = await League.findById(req.params.id)
       .populate({
         path: 'invitations',
+        match: { status: { $in: ['pending', 'accepted'] } },
         populate: {
           path: 'user',
           select: 'username email',
@@ -194,16 +195,17 @@ router.put('/:leagueId/join', auth, async (req, res) => {
     const userId = req.user.id;
 
     const league = await League.findById(leagueId);
+    console.log('League:', league); 
     const invitation = await Invitation.findOne({ league: leagueId, user: userId, status: 'pending' });
 
     if (!league || !invitation) {
       return res.status(404).json({ msg: 'League or invitation not found' });
     }
 
+    // Updating the invitation status
     invitation.status = 'accepted';
     await invitation.save();
 
-    league.members.push(userId);
     await league.save();
 
     res.json(league);
